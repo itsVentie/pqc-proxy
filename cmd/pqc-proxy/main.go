@@ -1,58 +1,69 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"pqc-proxy/internal/config"
+	"pqc-proxy/internal/logger"
+	"pqc-proxy/internal/metrics"
 	"pqc-proxy/internal/network"
 )
 
 func main() {
-	mode := flag.String("mode", "", "Running mode: client or server")
-	listenAddr := flag.String("listen", "", "Address to listen on")
-	targetAddr := flag.String("target", "", "Target remote address")
+	cfg := config.Load()
 
-	flag.Parse()
-
-	if *mode != "client" && *mode != "server" {
-		fmt.Println("Usage of pqc-proxy:")
-		flag.PrintDefaults()
+	if cfg.Mode != "client" && cfg.Mode != "server" {
+		fmt.Println("Usage: pqc-proxy -mode [client|server] -listen [addr] -target [addr]")
 		os.Exit(1)
 	}
 
-	if *listenAddr == "" || *targetAddr == "" {
-		log.Fatalf("Error: both -listen and -target flags are required")
+	if cfg.ListenAddr == "" || cfg.TargetAddr == "" {
+		fmt.Println("Error: both -listen and -target parameters are required")
+		os.Exit(1)
 	}
+
+	logger.Init(cfg.Debug)
+	slog.Info("Initializing pqc-proxy", "mode", cfg.Mode, "version", "0.1.4")
+
+	metrics.Init()
+	go func() {
+		slog.Info("Starting Prometheus metrics server", "addr", cfg.MetricsAddr)
+		if err := metrics.StartServer(cfg.MetricsAddr); err != nil {
+			slog.Error("Metrics server failed", "error", err)
+		}
+	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	if *mode == "server" {
-		srv := network.NewServer(*listenAddr, *targetAddr)
-		fmt.Printf("[+] Starting PQC SERVER on %s -> Forwarding to %s\n", *listenAddr, *targetAddr)
+	if cfg.Mode == "server" {
+		srv := network.NewServer(cfg.ListenAddr, cfg.TargetAddr)
+		slog.Info("Starting PQC SERVER", "listen", cfg.ListenAddr, "target", cfg.TargetAddr)
 		go func() {
 			if err := srv.Start(); err != nil {
-				log.Fatalf("Server error: %v", err)
+				slog.Error("Server runtime error", "error", err)
+				os.Exit(1)
 			}
 		}()
 		<-sigChan
-		fmt.Println("\n[-] Shutting down server...")
+		slog.Info("Shutting down server...")
 		srv.Stop()
 	} else {
-		cli := network.NewClient(*listenAddr, *targetAddr)
-		fmt.Printf("[+] Starting PQC CLIENT on %s -> Tunneling to %s\n", *listenAddr, *targetAddr)
+		cli := network.NewClient(cfg.ListenAddr, cfg.TargetAddr)
+		slog.Info("Starting PQC CLIENT", "listen", cfg.ListenAddr, "target", cfg.TargetAddr)
 		go func() {
 			if err := cli.Start(); err != nil {
-				log.Fatalf("Client error: %v", err)
+				slog.Error("Client runtime error", "error", err)
+				os.Exit(1)
 			}
 		}()
 		<-sigChan
-		fmt.Println("\n[-] Shutting down client...")
+		slog.Info("Shutting down client...")
 		cli.Stop()
 	}
-	fmt.Println("[+] Off.")
+	slog.Info("Application stopped cleanly")
 }
