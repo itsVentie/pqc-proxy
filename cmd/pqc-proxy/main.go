@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"pqc-proxy/internal/config"
+	"pqc-proxy/internal/crypto"
 	"pqc-proxy/internal/logger"
 	"pqc-proxy/internal/metrics"
 	"pqc-proxy/internal/network"
@@ -29,6 +30,13 @@ func main() {
 	logger.Init(cfg.Debug)
 	slog.Info("Initializing pqc-proxy", "mode", cfg.Mode, "version", "0.1.4")
 
+	pqcKeys, err := crypto.GenerateKeyPair()
+	if err != nil {
+		slog.Error("Failed to initialize PQC keys", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("PQC keys generated successfully")
+
 	metrics.Init()
 	go func() {
 		slog.Info("Starting Prometheus metrics server", "addr", cfg.MetricsAddr)
@@ -41,7 +49,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if cfg.Mode == "server" {
-		srv := network.NewServer(cfg.ListenAddr, cfg.TargetAddr)
+		srv := network.NewServer(cfg.ListenAddr, cfg.TargetAddr, pqcKeys)
 		slog.Info("Starting PQC SERVER", "listen", cfg.ListenAddr, "target", cfg.TargetAddr)
 		go func() {
 			if err := srv.Start(); err != nil {
@@ -50,10 +58,9 @@ func main() {
 			}
 		}()
 		<-sigChan
-		slog.Info("Shutting down server...")
 		srv.Stop()
 	} else {
-		cli := network.NewClient(cfg.ListenAddr, cfg.TargetAddr)
+		cli := network.NewClient(cfg.ListenAddr, cfg.TargetAddr, pqcKeys)
 		slog.Info("Starting PQC CLIENT", "listen", cfg.ListenAddr, "target", cfg.TargetAddr)
 		go func() {
 			if err := cli.Start(); err != nil {
@@ -62,7 +69,6 @@ func main() {
 			}
 		}()
 		<-sigChan
-		slog.Info("Shutting down client...")
 		cli.Stop()
 	}
 	slog.Info("Application stopped cleanly")

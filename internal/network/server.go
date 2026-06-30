@@ -13,12 +13,14 @@ type Server struct {
 	listenAddr string
 	targetAddr string
 	listener   net.Listener
+	pqcKeys    *crypto.PQCKeyPair
 }
 
-func NewServer(listenAddr, targetAddr string) *Server {
+func NewServer(listenAddr, targetAddr string, keys *crypto.PQCKeyPair) *Server {
 	return &Server{
 		listenAddr: listenAddr,
 		targetAddr: targetAddr,
+		pqcKeys:    keys,
 	}
 }
 
@@ -37,6 +39,8 @@ func (s *Server) Start() error {
 			}
 			continue
 		}
+
+		InjectChaos(conn)
 		go s.handleConnection(conn)
 	}
 }
