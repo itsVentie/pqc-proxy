@@ -1,0 +1,60 @@
+version: '3.8'
+
+networks:
+  pqc-network:
+    driver: bridge
+
+services:
+  target-app:
+    image: python:3-alpine
+    container_name: target-app
+    command: python -m http.server 8000
+    networks:
+      - pqc-network
+
+  pqc-server:
+    build:
+      context: ../
+      dockerfile: deployments/Dockerfile
+    container_name: pqc-server
+    command: ["-mode", "server", "-listen", ":9090", "-target", "target-app:8000", "-metrics", ":2112", "-debug"]
+    ports:
+      - "9090:9090"
+    networks:
+      - pqc-network
+    depends_on:
+      - target-app
+
+  pqc-client:
+    build:
+      context: ../
+      dockerfile: deployments/Dockerfile
+    container_name: pqc-client
+    command: ["-mode", "client", "-listen", ":3000", "-target", "pqc-server:9090", "-metrics", ":2113", "-debug"]
+    ports:
+      - "3000:3000"
+    networks:
+      - pqc-network
+    depends_on:
+      - pqc-server
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - prometheus_config:/etc/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - pqc-network
+    depends_on:
+      - pqc-server
+      - pqc-client
+
+volumes:
+  prometheus_config:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/prometheus.yml
+      o: bind

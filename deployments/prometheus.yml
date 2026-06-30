@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'pqc-server-metrics'
+    static_configs:
+      - targets: ['pqc-server:2112']
+
+  - job_name: 'pqc-client-metrics'
+    static_configs:
+      - targets: ['pqc-client:2113']
