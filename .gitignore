@@ -18,3 +18,5 @@ Thumbs.db
 *.swp
 docker-compose.override.yml
 *.tmp
+dist/
+dist
