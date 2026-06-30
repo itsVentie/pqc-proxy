@@ -16,3 +16,5 @@ Thumbs.db
 *.njsproj
 *.sln
 *.swp
+docker-compose.override.yml
+*.tmp
