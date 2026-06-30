@@ -1,104 +1,77 @@
-
 # pqc-proxy (Hybrid Post-Quantum TCP Tunnel)
 
 A lightweight infrastructure proxy server (Client/Server architecture) engineered to secure legacy TCP application traffic against interception (sniffing) and retrospective decryption utilizing quantum cryptanalysis methodologies (e.g., Shor's algorithm).
 
+## Why Post-Quantum?
+
+Traditional cryptography (RSA, ECDH) relies on the hardness of integer factorization and discrete logarithms. Large-scale quantum computers will render these obsolete. **pqc-proxy** provides an immediate security layer for legacy applications by implementing a hybrid approach, combining classical security with lattice-based cryptography today, ensuring "harvest now, decrypt later" protection.
+
 ## Architecture
 
-The project implements a **Crypto-Agility** paradigm through a hybrid key exchange mechanism, combining classical elliptic curve cryptography with post-quantum lattice-based key encapsulation mechanisms.
+The project implements a **Crypto-Agility** paradigm through a hybrid key exchange mechanism.
 
-* **Classical Layer:** Diffie-Hellman over Curve25519 (`X25519`) to maintain backwards compatibility and mitigate conventional cryptographic threats.
-* **Post-Quantum Layer:** `ML-KEM-768` Key Encapsulation Mechanism (NIST FIPS 203 standard), providing quantum-safe security equivalent to AES-192.
-* **Key Derivation Function (KDF):** `HKDF-SHA256`. Shared secrets from both mathematical domains are concatenated and derived into a single, indivisible master key. Compromise of either cryptographic primitive independently does not lead to session compromise.
-* **Transport Layer (AEAD):** The network stream is encapsulated within a custom abstraction layer overriding `net.Conn`. Data is fragmented into discrete frames (up to 32 KB) and encrypted using the `ChaCha20-Poly1305` authenticated encryption cipher. A monotonically incremented nonce is enforced per frame to mitigate Replay Attacks.
-* **Memory Management:** Socket-to-socket data relaying utilizes a `sync.Pool` buffer allocation system. Dynamic heap allocations are eliminated during the hot path data transfer phase (Zero-Allocation Pipeline), minimizing Latency and mitigating Garbage Collector overhead under peak network workloads.
+* **Classical Layer:** Diffie-Hellman over Curve25519 (`X25519`).
+* **Post-Quantum Layer:** `ML-KEM-768` (NIST FIPS 203 standard).
+* **KDF:** `HKDF-SHA256` (concatenated shared secrets).
+* **Transport Layer (AEAD):** `ChaCha20-Poly1305` with per-frame monotonicity.
+* **Performance:** Zero-Allocation Pipeline using `sync.Pool`.
 
 ## Project Structure
 
 ```text
 ├── .github/workflows/   # CI/CD pipelines (GitHub Actions)
 ├── cmd/
-│   └── pqc-proxy/       # Application entry point (main.go)
-├── deployments/         # Docker Compose configurations and Prometheus manifests
+│   └── pqc-proxy/       # Application entry point
+├── deployments/         # Docker Compose and Prometheus manifests
 ├── internal/
-│   ├── config/          # Configuration parsing module
-│   ├── crypto/          # Cryptographic core engine (X25519, ML-KEM, Conn)
-│   ├── logger/          # Structured logging component
-│   ├── metrics/         # Prometheus metrics exporter
-│   └── network/         # Network engine (Client, Server, Buffer Pool)
-├── scripts/             # Automation scripts for testing and benchmarking
-└── web/                 # Static files for the monitoring dashboard
+│   ├── config/          # Configuration parsing
+│   ├── crypto/          # Cryptographic core engine
+│   ├── network/         # Client, Server, Chaos injection & Pipe tests
+│   └── ...
+├── scripts/             # Automation scripts
+└── web/                 # Monitoring dashboard static files
 
 ```
-
-## Prerequisites
-
-* Go 1.24 or higher
-* Python 3.x (Optional, required for local verification environments)
 
 ## Compilation
 
-Compile the binary from the root directory of the repository:
+Compile from the root directory:
 
-### Windows:
+**Windows:** `go build -o pqc-proxy.exe ./cmd/pqc-proxy`
 
-```bash
-go build -o pqc-proxy.exe ./cmd/pqc-proxy
-
-```
-
-### Linux / macOS:
-
-```bash
-go build -o pqc-proxy ./cmd/pqc-proxy
-
-```
+**Linux/macOS:** `go build -o pqc-proxy ./cmd/pqc-proxy`
 
 ## Verification & Testing
 
-Execute the complete unit test suite validating the cryptographic core and network pipeline:
+The project features a comprehensive test suite covering cryptographic primitives and network pipeline stability.
 
 ```bash
+# Validate cryptographic integrity and network pipe logic
 go test -v ./internal/...
 
 ```
 
-### Environment Simulation Topology:
+## Quick Start Topology
 
 ```text
-[Legacy Client] -> (TCP:3000) -> [PQC Client] -> (PQC Tunnel:9090) -> [PQC Server] -> (TCP:8000) -> [Target App]
+[Client App] -> (Local:3000) -> [PQC Client] -> (Tunnel:9090) -> [PQC Server] -> (Target:8000) -> [Backend App]
 
 ```
 
-1. **Initialize the Target Application (Backend Service):**
-```bash
-python -m http.server 8000
+1. **Start Backend:** `python -m http.server 8000`
+2. **Start Server:** `./pqc-proxy -mode server -listen :9090 -target 127.0.0.1:8000`
+3. **Start Client:** `./pqc-proxy -mode client -listen :3000 -target 127.0.0.1:9090`
+4. **Access:** `curl http://127.0.0.1:3000`
 
-```
+## Status & Roadmap
 
-
-2. **Execute the Proxy in SERVER Mode:**
-```bash
-./pqc-proxy -mode server -listen :9090 -target 127.0.0.1:8000
-
-```
-
-
-3. **Execute the Proxy in CLIENT Mode:**
-```bash
-./pqc-proxy -mode client -listen :3000 -target 127.0.0.1:9090
-
-```
-
-
-4. **Verify End-to-End Encrypted Proxying:**
-```bash
-curl [http://127.0.0.1:3000](http://127.0.0.1:3000)
-
-```
-
-
+* [x] Hybrid Key Exchange (X25519 + ML-KEM-768)
+* [x] AEAD Transport Encryption (ChaCha20-Poly1305)
+* [x] CI/CD Pipeline (GitHub Actions)
+* [x] Chaos Testing Framework
+* [ ] UDP Support
+* [ ] Certificate-based Authentication
 
 ## License
 
-This project is distributed under the MIT License. Refer to the `LICENSE` file for full legal provisions.
+Distributed under the MIT License.
