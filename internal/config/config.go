@@ -10,6 +10,7 @@ type Config struct {
 	ListenAddr  string
 	TargetAddr  string
 	MetricsAddr string
+	Secret      string
 	Debug       bool
 }
 
@@ -20,6 +21,7 @@ func Load() *Config {
 	flag.StringVar(&cfg.ListenAddr, "listen", getEnv("PQC_LISTEN", ""), "Address to listen on")
 	flag.StringVar(&cfg.TargetAddr, "target", getEnv("PQC_TARGET", ""), "Target remote address")
 	flag.StringVar(&cfg.MetricsAddr, "metrics", getEnv("PQC_METRICS", ":2112"), "Address for Prometheus metrics")
+	flag.StringVar(&cfg.Secret, "secret", getEnv("PQC_SECRET", ""), "Shared secret key for authentication")
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debug logging")
 
 	flag.Parse()

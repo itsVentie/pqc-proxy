@@ -49,7 +49,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if cfg.Mode == "server" {
-		srv := network.NewServer(cfg.ListenAddr, cfg.TargetAddr, pqcKeys)
+		srv := network.NewServer(cfg.ListenAddr, cfg.TargetAddr, pqcKeys, cfg.Secret)
 		slog.Info("Starting PQC SERVER", "listen", cfg.ListenAddr, "target", cfg.TargetAddr)
 		go func() {
 			if err := srv.Start(); err != nil {
@@ -60,7 +60,7 @@ func main() {
 		<-sigChan
 		srv.Stop()
 	} else {
-		cli := network.NewClient(cfg.ListenAddr, cfg.TargetAddr, pqcKeys)
+		cli := network.NewClient(cfg.ListenAddr, cfg.TargetAddr, pqcKeys, cfg.Secret)
 		slog.Info("Starting PQC CLIENT", "listen", cfg.ListenAddr, "target", cfg.TargetAddr)
 		go func() {
 			if err := cli.Start(); err != nil {

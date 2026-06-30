@@ -14,13 +14,15 @@ type Server struct {
 	targetAddr string
 	listener   net.Listener
 	pqcKeys    *crypto.PQCKeyPair
+	Secret     string
 }
 
-func NewServer(listenAddr, targetAddr string, keys *crypto.PQCKeyPair) *Server {
+func NewServer(listenAddr, targetAddr string, keys *crypto.PQCKeyPair, secret string) *Server {
 	return &Server{
 		listenAddr: listenAddr,
 		targetAddr: targetAddr,
 		pqcKeys:    keys,
+		Secret:     secret,
 	}
 }
 
@@ -53,6 +55,18 @@ func (s *Server) Stop() {
 
 func (s *Server) handleConnection(clientConn net.Conn) {
 	defer clientConn.Close()
+
+	if s.Secret != "" {
+		tokenBuf := make([]byte, 64)
+		_, err := io.ReadFull(clientConn, tokenBuf)
+		if err != nil {
+			return
+		}
+
+		if !crypto.VerifyAuthToken(string(tokenBuf), s.Secret, "v1") {
+			return
+		}
+	}
 
 	clientInceptionBlob := make([]byte, 32+1184)
 	if _, err := io.ReadFull(clientConn, clientInceptionBlob); err != nil {

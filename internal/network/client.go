@@ -13,13 +13,15 @@ type Client struct {
 	serverAddr string
 	listener   net.Listener
 	pqcKeys    *crypto.PQCKeyPair
+	Secret     string
 }
 
-func NewClient(listenAddr, serverAddr string, keys *crypto.PQCKeyPair) *Client {
+func NewClient(listenAddr, serverAddr string, keys *crypto.PQCKeyPair, secret string) *Client {
 	return &Client{
 		listenAddr: listenAddr,
 		serverAddr: serverAddr,
 		pqcKeys:    keys,
+		Secret:     secret,
 	}
 }
 
@@ -55,6 +57,14 @@ func (c *Client) handleConnection(localConn net.Conn) {
 		return
 	}
 	defer serverConn.Close()
+
+	if c.Secret != "" {
+		token := crypto.GenerateAuthToken(c.Secret, "v1")
+		_, err := serverConn.Write([]byte(token))
+		if err != nil {
+			return
+		}
+	}
 
 	ecdhPriv, mlkemPriv, clientBlob, err := crypto.GenerateClientInception()
 	if err != nil {
